@@ -129,4 +129,13 @@ namespace minesweeper
         theme_mount_ = native;
         return { };
     }
+
+    void Filesystem::unmount_theme() noexcept
+    {
+        if (!theme_mount_)
+            return;
+
+        PHYSFS_unmount(theme_mount_->c_str());
+        theme_mount_.reset();
+    }
 } // namespace minesweeper

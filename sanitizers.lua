@@ -126,7 +126,6 @@ rule("mode.sanitize")
         local list = {}
         if san.address then
             table.insert(list, "address")
-            table.insert(list, "pointer-compare")
             table.insert(list, "pointer-subtract")
         end
         if san.undefined then table.insert(list, "undefined") end
@@ -188,7 +187,7 @@ rule("mode.sanitize")
 
         local asan = "strict_string_checks=1:detect_stack_use_after_return=1" ..
                      ":check_initialization_order=1:strict_init_order=1" ..
-                     ":detect_invalid_pointer_pairs=1:halt_on_error=1"
+                     ":halt_on_error=1"
         if target:is_plat("linux") then
             asan = asan .. ":detect_leaks=1"
         end

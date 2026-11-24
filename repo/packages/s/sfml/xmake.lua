@@ -95,18 +95,24 @@ package("sfml")
         end
 
         if package:config("graphics") then
-            package:add("deps", "freetype")
+            package:add("deps", "freetype", "harfbuzz")
         end
 
         if package:is_plat("linux") then
             if package:config("window") or package:config("graphics") then
-                package:add("deps", "libx11", "libxcursor", "libxrandr", "libxrender", "libxfixes", "libxext", "eudev", "libxi")
+                import("lib.detect.find_package")
+                local udev_dep = find_package("libudev") and "libudev" or "eudev"
+                package:add("deps", "libx11", "libxcursor", "libxrandr", "libxrender", "libxfixes", "libxext", udev_dep, "libxi")
                 package:add("deps", "opengl", "glx", { optional = true })
             end
         end
 
         if package:config("audio") then
             package:add("deps", "libogg", "libflac", "libvorbis")
+        end
+
+        if package:config("network") then
+            package:add("deps", "mbedtls")
         end
 
         package:add("components", "system")
@@ -195,9 +201,12 @@ package("sfml")
             table.insert(configs, "-DSFML_USE_SYSTEM_DEPS=TRUE")
         end
 
-        local opt = { }
+        local opt = { packagedeps = { } }
         if package:config("graphics") then
-            opt.packagedeps = { "freetype", "zlib" }
+            table.join2(opt.packagedeps, { "freetype", "harfbuzz", "zlib" })
+        end
+        if package:config("network") then
+            table.insert(opt.packagedeps, "mbedtls")
         end
         if not package:is_plat("windows") then
             opt.cmake_generator = "Ninja"
@@ -206,7 +215,7 @@ package("sfml")
 
         local moddir = path.join(package:installdir(), "modules", "sfml")
         os.mkdir(moddir)
-        local defines = {}
+        local defines = { }
         for _, name in ipairs({ "graphics", "window", "audio", "network" }) do
             if package:config(name) then
                 table.insert(defines, "BUILD_" .. name:upper() .. "_MODULE")

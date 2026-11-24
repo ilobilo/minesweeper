@@ -43,6 +43,8 @@ export namespace minesweeper
         std::expected<void, ErrorInfo> mount_builtin(std::span<const std::byte> archive) noexcept;
         std::expected<void, ErrorInfo> mount_theme(const fs::path &assets, std::string_view name);
 
+        void unmount_theme() noexcept;
+
         private:
         std::optional<std::string> theme_mount_;
         bool active_ = true;

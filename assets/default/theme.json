@@ -1,4 +1,5 @@
 {
+    "version": 1,
     "name": "default",
     "atlases": {
         "tiles": {
@@ -6,18 +7,23 @@
             "smooth": false,
             "regions": {
                 "covered": [0, 0, 16, 16],
-                "revealed": [16, 0, 16, 16],
-                "flag": [32, 0, 16, 16],
-                "wrong_flag": [48, 0, 16, 16],
+                "pressed": [16, 0, 16, 16],
+                "revealed": [32, 0, 16, 16],
+                "question": [48, 0, 16, 16],
+
                 "mine": [0, 16, 16, 16],
                 "exploded_mine": [16, 16, 16, 16],
-                "number_1": [32,  0, 16, 16],
-                "number_2": [32, 16, 16, 16],
+                "flag": [32, 16, 16, 16],
+                "wrong_flag": [48, 16, 16, 16],
+
+                "number_1": [0,  32, 16, 16],
+                "number_2": [16, 32, 16, 16],
                 "number_3": [32, 32, 16, 16],
-                "number_4": [32, 48, 16, 16],
-                "number_5": [48,  0, 16, 16],
-                "number_6": [48, 16, 16, 16],
-                "number_7": [48, 32, 16, 16],
+                "number_4": [48, 32, 16, 16],
+
+                "number_5": [0,  48, 16, 16],
+                "number_6": [16, 48, 16, 16],
+                "number_7": [32, 48, 16, 16],
                 "number_8": [48, 48, 16, 16]
             }
         },
@@ -26,13 +32,58 @@
             "smooth": false,
             "regions": {
                 "restart": [0, 0, 16, 16],
-                "settings": [16, 0, 16, 16]
+                "settings": [16, 0, 16, 16],
+                "close": [32, 0, 16, 16],
+                "pause": [48, 0, 16, 16],
+
+                "sound_on": [0, 16, 16, 16],
+                "sound_off": [16, 16, 16, 16],
+                "checkbox_unchecked": [32, 16, 16, 16],
+                "checkbox_checked": [48, 16, 16, 16],
+
+                "arrow_left": [0, 32, 16, 16],
+                "arrow_right": [16, 32, 16, 16],
+                "arrow_up": [32, 32, 16, 16],
+                "arrow_down": [48, 32, 16, 16],
+
+                "restart_caution": [0, 48, 16, 16],
+                "restart_win": [16, 48, 16, 16],
+                "restart_lose": [32, 48, 16, 16],
+                "trophy": [48, 48, 16, 16]
             }
         }
     },
+    "metrics": {
+        "tile_scale": 2.0,
+        "hud_height": 48,
+        "board_padding": 12,
+        "bevel_width": 3
+    },
     "fonts": {
-        "menu": "fonts/menu.ttf",
-        "game": "fonts/game.ttf"
+        "menu": {
+            "file": "fonts/menu.ttf",
+            "size": 16,
+            "smooth": false
+        },
+        "game": {
+            "file": "fonts/game.ttf",
+            "size": 20,
+            "smooth": false
+        }
+    },
+    "colors": {
+        "background": "#C0C0C0",
+        "panel": "#C0C0C0",
+        "bevel_light": "#FFFFFF",
+        "bevel_dark": "#808080",
+        "text": "#000000",
+        "counter_bg": "#000000",
+        "counter_text": "#FF0000",
+        "button": "#D0D0D0",
+        "button_hover": "#DCDCDC",
+        "button_pressed": "#A8A8A8",
+        "accent": "#000080",
+        "overlay": "#00000080"
     },
     "sounds": {
         "reveal": "sounds/reveal.wav",
@@ -40,9 +91,5 @@
         "unflag": "sounds/unflag.wav",
         "win": "sounds/win.wav",
         "lose": "sounds/lose.wav"
-    },
-    "colors": {
-        "background": "#C0C0C0",
-        "text": "#000000"
     }
 }

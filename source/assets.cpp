@@ -8,12 +8,12 @@ module minesweeper;
 
 namespace minesweeper
 {
-    std::expected<InputStream, AssetError> InputStream::create(const std::string &path) noexcept
+    std::expected<std::unique_ptr<InputStream>, AssetError> InputStream::create(const std::string &path)
     {
         auto *file = PHYSFS_openRead(path.c_str());
         if (file == nullptr)
             return std::unexpected { AssetError::asset_not_found };
-        return InputStream { file };
+        return std::unique_ptr<InputStream> { new InputStream { file } };
     }
 
     InputStream::~InputStream()

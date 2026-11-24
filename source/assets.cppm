@@ -18,7 +18,7 @@ export namespace minesweeper
     class InputStream : public sf::InputStream
     {
         public:
-        static std::expected<InputStream, AssetError> create(const std::string &path) noexcept;
+        static std::expected<std::unique_ptr<InputStream>, AssetError> create(const std::string &path);
 
         ~InputStream() override;
 
@@ -106,7 +106,7 @@ export namespace minesweeper
                 return std::unexpected { stream.error() };
 
             Asset result { std::move(*stream) };
-            if (!Loader::load(result.object_, result.stream_))
+            if (!Loader::load(result.object_, *result.stream_))
                 return std::unexpected { AssetError::invalid_contents };
 
             return result;
@@ -122,32 +122,31 @@ export namespace minesweeper
         template<typename Self>
         [[nodiscard]] decltype(auto) get(this Self &&self) noexcept
         {
-            return std::forward<Self>(self).object_;
+            return (std::forward_like<Self>(self).object_);
         }
 
         template<typename Self>
         [[nodiscard]] decltype(auto) operator*(this Self &&self) noexcept
         {
-            return std::forward<Self>(self).object_;
+            return (std::forward_like<Self>(self).object_);
         }
 
-        template<typename Self>
-        [[nodiscard]] decltype(auto) operator->(this Self &&self) noexcept
+        [[nodiscard]] decltype(auto) operator->(this auto &&self) noexcept
         {
-            return std::addressof(std::forward<Self>(self).object_);
+            return std::addressof(self.object_);
         }
 
         template<typename Self, typename ...Args>
         [[nodiscard]] Loader::Instance instantiate(this Self &&self, Args &&...args)
         {
-            return { std::forward<Self>(self).object_, std::forward<Args>(args)... };
+            return { std::forward_like<Self>(self).object_, std::forward<Args>(args)... };
         }
 
         private:
-        InputStream stream_;
+        std::unique_ptr<InputStream> stream_;
         Type object_;
 
-        Asset(InputStream &&stream) noexcept
+        Asset(std::unique_ptr<InputStream> stream) noexcept
             : stream_ { std::move(stream) }, object_ { } { }
     };
 

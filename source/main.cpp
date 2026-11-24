@@ -27,7 +27,7 @@ namespace
     };
 } // namespace
 
-constexpr unsigned  builtin_theme[] {
+constexpr unsigned char builtin_theme[] {
 #embed "builtin.zip"
 };
 
@@ -65,7 +65,7 @@ int main(int argc, char **argv)
 
         if (const auto res = fs->mount_builtin(std::as_bytes(std::span { builtin_theme })); !res)
         {
-            log::error("{}", fs.error().what());
+            log::error("{}", res.error().what());
             return 1;
         }
 
