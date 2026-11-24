@@ -4,9 +4,6 @@ import minesweeper;
 import cli11;
 import std;
 
-namespace fs = std::filesystem;
-namespace log = minesweeper::log;
-
 namespace
 {
     class CompactFormatter : public CLI::Formatter
@@ -30,21 +27,53 @@ namespace
     };
 } // namespace
 
+constexpr unsigned  builtin_theme[] {
+#embed "builtin.zip"
+};
+
 int main(int argc, char **argv)
 {
+    namespace log = minesweeper::log;
+
     CLI::App app { "A Minesweeper-like game written in C++", "minesweeper" };
     try {
         app.formatter(std::make_shared<CompactFormatter>());
         app.failure_message(CLI::FailureMessage::help);
 
-        fs::path theme { "./assets/default" };
-        app.add_option("-t,--theme", theme, "Directory containing theme assets")
+        std::optional<fs::path> assets { "./assets" };
+        app.add_option("-a,--assets", *assets, "Directory containing game themes")
+            ->default_str(*assets);
+
+        std::string theme { "default" };
+        app.add_option("-t,--theme", theme, "Name of the theme to use")
             ->default_str(theme);
 
         app.parse(argc, argv);
 
-        if (!fs::is_directory(theme))
-            log::error("Path '{}' does not exist or is not a directory. Using built-in assets", theme);
+        if (!fs::is_directory(*assets))
+        {
+            log::error("Path '{}' does not exist or is not a directory. Using built-in theme", *assets);
+            assets = std::nullopt;
+        }
+
+        auto fs = minesweeper::Filesystem::create(argv[0]);
+        if (!fs)
+        {
+            log::error("{}", fs.error().what());
+            return 1;
+        }
+
+        if (const auto res = fs->mount_builtin(std::as_bytes(std::span { builtin_theme })); !res)
+        {
+            log::error("{}", fs.error().what());
+            return 1;
+        }
+
+        if (assets)
+        {
+            if (const auto res = fs->mount_theme(*assets, theme); !res)
+                log::warn("{}. Using built-in theme", res.error().what());
+        }
 
         minesweeper::Game game;
         game.run();

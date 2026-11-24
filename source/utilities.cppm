@@ -4,6 +4,8 @@ export module minesweeper:utilities;
 
 import std;
 
+export namespace fs = std::filesystem;
+
 export namespace minesweeper::util
 {
     template<typename ...Funcs>

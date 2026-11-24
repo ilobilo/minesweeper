@@ -44,11 +44,47 @@ local archivers = {
     ["iso9660"] = false,
     ["vdf"] = false,
 }
-add_requires("physfs", { configs = archivers})
+add_requires("physfs", { configs = archivers })
+
+rule("pack_assets")
+    on_config(function (target)
+        local autogendir = target:autogendir()
+        os.mkdir(autogendir)
+        target:add("cxflags", "--embed-dir=" .. autogendir, { force = true })
+    end)
+
+    before_build(function (target)
+        import("core.project.depend")
+        import("utils.archive")
+        import("utils.progress")
+
+        local assetsdir = path.join(os.projectdir(), "assets/default")
+        local zipfile = path.absolute(path.join(target:autogendir(), "builtin.zip"))
+        local files = os.files(path.join(assetsdir, "**"))
+
+        depend.on_changed(function ()
+            progress.show(
+                opt and opt.progress or 0,
+                "<%s> ${color.build.object}packing.$(mode) %s",
+                target:name(), path.filename(zipfile)
+            )
+
+            os.tryrm(zipfile)
+            local oldir = os.cd(assetsdir)
+            local entries = os.filedirs("*")
+            if #entries > 0 then
+                archive.archive(zipfile, entries, { recurse = true })
+            end
+            os.cd(oldir)
+        end, { dependfile = target:dependfile(zipfile), files = files })
+    end)
+rule_end()
 
 target("minesweeper")
     set_kind("binary")
     add_packages("sfml", "cli11", "nlohmann_json", "physfs")
 
-    add_embeddirs("assets")
+    add_cxflags("-Wno-c23-extensions")
+
+    add_rules("pack_assets")
     add_files("source/**.cpp", "source/**.cppm")
