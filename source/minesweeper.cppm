@@ -4,3 +4,10 @@ export module minesweeper;
 
 export import :game;
 export import :board;
+
+export import :assets;
+export import :theme;
+export import :graphics;
+
+export import :log;
+export import :utilities;

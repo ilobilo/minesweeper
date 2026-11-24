@@ -1,7 +1,7 @@
 -- The following file has been clanked out by a clanker
 -- Based on https://github.com/xmake-io/xmake-repo/blob/9bf30fdddc25f58bf7c966da383c8659246e0a3d/packages/s/sfml/xmake.lua
 
-package("sfml-modules")
+package("sfml")
     set_homepage("https://www.sfml-dev.org")
     set_description("Simple and Fast Multimedia Library")
     set_license("zlib")
@@ -244,14 +244,14 @@ package("sfml-modules")
                 sf::Clock c;
                 c.restart();
             }
-        ]]}, { configs = configs, includes = "SFML/System.hpp" }))
+        ]] }, { configs = configs, includes = "SFML/System.hpp" }))
         if package:config("graphics") then
-            assert(package:check_cxxsnippets({test = [[
+            assert(package:check_cxxsnippets({ test = [[
                 void test(const sf::Texture& texture, const sf::Color& color) {
                     sf::Sprite sprite(texture);
                     sprite.setColor(color);
                 }
-            ]]}, { configs = configs, includes = "SFML/Graphics.hpp" }))
+            ]] }, { configs = configs, includes = "SFML/Graphics.hpp" }))
         end
         local moddir = path.join(package:installdir(), "modules", "sfml")
         assert(os.isfile(path.join(moddir, "SFML.cppm")), "SFML.cppm was not installed")

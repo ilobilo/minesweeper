@@ -1,0 +1,48 @@
+{
+    "name": "default",
+    "atlases": {
+        "tiles": {
+            "file": "textures/tiles.png",
+            "smooth": false,
+            "regions": {
+                "covered": [0, 0, 16, 16],
+                "revealed": [16, 0, 16, 16],
+                "flag": [32, 0, 16, 16],
+                "wrong_flag": [48, 0, 16, 16],
+                "mine": [0, 16, 16, 16],
+                "exploded_mine": [16, 16, 16, 16],
+                "number_1": [32,  0, 16, 16],
+                "number_2": [32, 16, 16, 16],
+                "number_3": [32, 32, 16, 16],
+                "number_4": [32, 48, 16, 16],
+                "number_5": [48,  0, 16, 16],
+                "number_6": [48, 16, 16, 16],
+                "number_7": [48, 32, 16, 16],
+                "number_8": [48, 48, 16, 16]
+            }
+        },
+        "ui": {
+            "file": "textures/ui.png",
+            "smooth": false,
+            "regions": {
+                "restart": [0, 0, 16, 16],
+                "settings": [16, 0, 16, 16]
+            }
+        }
+    },
+    "fonts": {
+        "menu": "fonts/menu.ttf",
+        "game": "fonts/game.ttf"
+    },
+    "sounds": {
+        "reveal": "sounds/reveal.wav",
+        "flag": "sounds/flag.wav",
+        "unflag": "sounds/unflag.wav",
+        "win": "sounds/win.wav",
+        "lose": "sounds/lose.wav"
+    },
+    "colors": {
+        "background": "#C0C0C0",
+        "text": "#000000"
+    }
+}
