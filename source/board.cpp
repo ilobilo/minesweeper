@@ -44,7 +44,7 @@ namespace minesweeper
             return Result::none;
 
         const auto cell = at(x, y);
-        if (!cell || cell->flagged)
+        if (!cell || cell->is_flagged())
             return Result::none;
 
         if (!cell->revealed)
@@ -52,7 +52,7 @@ namespace minesweeper
 
         std::uint8_t flagged = 0;
         iterate_adjacent(x, y, [&flagged](Cell &adjacent, auto, auto) {
-            flagged += adjacent.flagged;
+            flagged += adjacent.is_flagged();
             return true;
         });
 
@@ -61,7 +61,7 @@ namespace minesweeper
 
         auto result = Result::none;
         iterate_adjacent(x, y, [&](Cell &adjacent, std::size_t cx, std::size_t cy) {
-            if (adjacent.revealed || adjacent.flagged)
+            if (adjacent.revealed || adjacent.is_flagged())
                 return true;
 
             const auto res = flood_reveal(cx, cy);
@@ -87,74 +87,70 @@ namespace minesweeper
         if (!cell || cell->revealed)
             return Result::none;
 
-        return (cell->flagged ^= true) ? Result::flagged : Result::unflagged;
+        switch (cell->mark)
+        {
+            case Mark::none:
+                cell->mark = Mark::flagged;
+                return Result::flagged;
+            case Mark::flagged:
+                cell->mark = Mark::question;
+                return Result::questioned;
+            case Mark::question:
+                cell->mark = Mark::none;
+                return Result::unmarked;
+        }
+        std::unreachable();
     }
 
     auto Board::reveal_cell(std::size_t x, std::size_t y) noexcept -> Result
     {
         auto cell = at(x, y);
-        if (!cell || cell->revealed || cell->flagged)
+        if (!cell || cell->revealed || cell->is_flagged())
             return Result::none;
+
+        cell->mark = Mark::none;
+        cell->revealed = true;
 
         if (cell->has_mine)
         {
-            cell->extra = true;
             state_ = State::lost;
             return Result::hit_mine;
         }
 
-        cell->revealed = true;
         revealed_count_++;
-
         if (mine_count_ + revealed_count_ == cells_.size())
             state_ = State::won;
+
         return Result::revealed;
     }
 
     auto Board::flood_reveal(std::size_t x, std::size_t y) -> Result
     {
-        std::vector<Cell *> visited;
-        auto res = [&] {
-            std::vector<std::pair<std::size_t, std::size_t>> pending { { x, y } };
-            auto result = Result::none;
+        const auto first = reveal_cell(x, y);
+        if (first != Result::revealed)
+            return first;
 
-            if (const auto cell = at(x, y))
-            {
-                cell->extra = true;
-                visited.emplace_back(std::addressof(*cell));
-            }
+        const auto start = at(x, y);
+        if (!start || start->adjacent != 0)
+            return first;
 
-            while (!pending.empty())
-            {
-                const auto [cx, cy] = pending.back();
-                pending.pop_back();
+        std::vector<std::pair<std::size_t, std::size_t>> pending { { x, y } };
+        while (!pending.empty())
+        {
+            const auto [cx, cy] = pending.back();
+            pending.pop_back();
 
-                const auto cell = at(cx, cy);
-                if (!cell || cell->revealed || cell->flagged)
-                    continue;
-
-                result = reveal_cell(cx, cy);
-                if (result == Result::hit_mine || state_ == State::won)
-                    return result;
-
-                if (cell->adjacent != 0)
-                    continue;
-
-                iterate_adjacent(cx, cy, [&](Cell &adjacent, std::size_t nx, std::size_t ny) {
-                    if (!adjacent.has_mine && !adjacent.revealed && !adjacent.flagged && !adjacent.extra)
-                    {
-                        adjacent.extra = true;
-                        pending.emplace_back(nx, ny);
-                        visited.emplace_back(&adjacent);
-                    }
+            iterate_adjacent(cx, cy, [&](Cell &adjacent, std::size_t nx, std::size_t ny) {
+                if (adjacent.has_mine || adjacent.revealed || adjacent.is_flagged())
                     return true;
-                });
-            }
-            return result;
-        } ();
-        for (auto *cell : visited)
-            cell->extra = false;
-        return res;
+
+                if (reveal_cell(nx, ny) == Result::revealed && adjacent.adjacent == 0)
+                    pending.emplace_back(nx, ny);
+
+                return true;
+            });
+        }
+        return Result::revealed;
     }
 
     void Board::iterate_adjacent(std::size_t x, std::size_t y, Callback func)

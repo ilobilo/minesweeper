@@ -6,14 +6,24 @@ import std;
 
 export namespace minesweeper
 {
+    enum class Mark : std::uint8_t
+    {
+        none,
+        flagged,
+        question
+    };
+
     struct Cell
     {
         bool has_mine : 1 = false;
         bool revealed : 1 = false;
-        bool flagged : 1 = false;
-        bool extra : 1 = false; // exploded or visited
+        Mark mark : 2 = Mark::none;
         std::uint8_t adjacent : 4 = 0;
+
+        [[nodiscard]] constexpr bool is_flagged() const noexcept { return mark == Mark::flagged; }
+        [[nodiscard]] constexpr bool is_question() const noexcept { return mark == Mark::question; }
     };
+    static_assert(sizeof(Cell) == 1);
 
     class Board
     {
@@ -38,7 +48,8 @@ export namespace minesweeper
             revealed,
             hit_mine,
             flagged,
-            unflagged
+            questioned,
+            unmarked
         };
 
         static constexpr std::size_t min_width = 4, min_height = 4;

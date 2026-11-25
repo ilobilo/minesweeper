@@ -110,7 +110,7 @@ export namespace minesweeper
 
     template<AtlasRegion Region, typename ...Types>
         requires (sizeof...(Types) == magic_enum::enum_count<AtlasRegion>())
-                && (static_cast<std::size_t>(Region) < sizeof...(Types))
+              && (static_cast<std::size_t>(Region) < sizeof...(Types))
     using AtlasRegionElement = Types...[static_cast<std::size_t>(Region)];
 
     template<AtlasRegion Region>
