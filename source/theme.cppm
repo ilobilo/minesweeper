@@ -31,6 +31,14 @@ export namespace minesweeper
         restart_caution, restart_win, restart_lose, trophy
     };
 
+    template<AtlasRegion Region, typename ...Types>
+        requires (sizeof...(Types) == magic_enum::enum_count<AtlasRegion>())
+              && (static_cast<std::size_t>(Region) < sizeof...(Types))
+    using AtlasRegionElement = Types...[static_cast<std::size_t>(Region)];
+
+    template<AtlasRegion Region>
+    using AtlasRegions = AtlasRegionElement<Region, TilesRegion, UiRegion>;
+
     enum class Metric : std::size_t
     {
         tile_scale,
@@ -108,129 +116,134 @@ export namespace minesweeper
         std::array<sf::IntRect, region_count> regions_;
     };
 
-    template<AtlasRegion Region, typename ...Types>
-        requires (sizeof...(Types) == magic_enum::enum_count<AtlasRegion>())
-              && (static_cast<std::size_t>(Region) < sizeof...(Types))
-    using AtlasRegionElement = Types...[static_cast<std::size_t>(Region)];
-
-    template<AtlasRegion Region>
-    using AtlasRegions = AtlasRegionElement<Region, TilesRegion, UiRegion>;
-
-    class Atlases
-    {
-        friend class Theme;
-
-        public:
-        template<AtlasRegion Reg, typename Self>
-        [[nodiscard]] decltype(auto) atlas(this Self &&self) noexcept
-        {
-            return std::get<Atlas<AtlasRegions<Reg>>>(std::forward_like<Self>(self.data_));
-        }
-
-        private:
-        using Tuple = decltype([]<std::size_t ...Is>(std::index_sequence<Is...>) {
-            constexpr auto regions = magic_enum::enum_values<AtlasRegion>();
-            return std::type_identity<std::tuple<Atlas<AtlasRegions<regions[Is]>>...>> { };
-        } (std::make_index_sequence<magic_enum::enum_count<AtlasRegion>()> { }))::type;
-
-        template<typename SubEnum>
-        static constexpr bool is_valid_sub_enum = []<std::size_t ...Is>(std::index_sequence<Is...>) {
-            return (std::same_as<Atlas<SubEnum>, std::tuple_element_t<Is, Tuple>> || ...);
-        } (std::make_index_sequence<std::tuple_size_v<Tuple>> { });
-
-        class Pending
-        {
-            public:
-            template <typename SubEnum>
-                requires is_valid_sub_enum<SubEnum>
-            void emplace(Atlas<SubEnum> &&atlas)
-            {
-                std::get<std::optional<Atlas<SubEnum>>>(data_).emplace(std::move(atlas));
-            }
-
-            [[nodiscard]] bool ready() const noexcept
-            {
-                return std::apply([](const auto &...opts) {
-                    return (opts.has_value() && ...);
-                }, data_);
-            }
-
-            [[nodiscard]] Atlases build() &&
-            {
-                return std::apply([](auto &...opts) {
-                    return Atlases { Tuple { std::move(*opts)... } };
-                }, data_);
-            }
-
-            private:
-            using OptionalTuple = decltype([]<std::size_t... Is>(std::index_sequence<Is...>) {
-                return std::type_identity<std::tuple<std::optional<std::tuple_element_t<Is, Tuple>>...>> { };
-            } (std::make_index_sequence<std::tuple_size_v<Tuple>> { }))::type;
-
-            OptionalTuple data_;
-        };
-
-        Tuple data_;
-
-        explicit Atlases(Tuple &&data) noexcept
-            : data_ { std::move(data) } { }
-    };
-
-    template<typename Enum, typename Type>
+    template<typename Enum, typename ...Types>
         requires std::is_enum_v<Enum>
-    struct EnumMap
+            && (magic_enum::enum_count<Enum>() > 0)
+            && (sizeof...(Types) == 1 || sizeof...(Types) == magic_enum::enum_count<Enum>())
+    class EnumMap
     {
         friend class Theme;
-
-        public:
-        template<typename Self>
-        [[nodiscard]] decltype(auto) operator[](this Self &&self, Enum key) noexcept
-        {
-            if constexpr (std::is_reference_v<Type>)
-                return self.data_[std::to_underlying(key)].get();
-            else
-                return (std::forward_like<Self>(self.data_)[std::to_underlying(key)]);
-        }
 
         private:
         static constexpr std::size_t count = magic_enum::enum_count<Enum>();
+        static constexpr bool is_homogeneous = (sizeof...(Types) == 1);
 
+        template<typename Type>
         using Stored = std::conditional_t<
             std::is_reference_v<Type>,
             std::reference_wrapper<std::remove_reference_t<Type>>,
             Type
         >;
 
+        template<Enum Key>
+        using ElementType = Types...[is_homogeneous ? 0 : std::to_underlying(Key)];
+
+        using Storage = decltype([] {
+            if constexpr (is_homogeneous)
+                return std::type_identity<std::array<Stored<Types...[0]>, count>> { };
+            else
+                return std::type_identity<std::tuple<Stored<Types>...>> { };
+        } ())::type;
+
         class Pending
         {
             public:
+            template<Enum Key, typename ...Args>
+                requires std::constructible_from<Stored<ElementType<Key>>, Args &&...>
+            void emplace(Args &&...args)
+            {
+                constexpr std::size_t idx = std::to_underlying(Key);
+                if constexpr (is_homogeneous)
+                    data_[idx].emplace(std::forward<Args>(args)...);
+                else
+                    std::get<idx>(data_).emplace(std::forward<Args>(args)...);
+            }
+
             template<typename ...Args>
-                requires std::constructible_from<Stored, Args &&...>
+                requires is_homogeneous && std::constructible_from<Stored<Types...[0]>, Args &&...>
             void emplace(Enum key, Args &&...args)
             {
                 data_[std::to_underlying(key)].emplace(std::forward<Args>(args)...);
             }
 
+            template<typename Arg>
+                requires (!is_homogeneous)
+                      && (!std::same_as<std::remove_cvref_t<Arg>, Enum>)
+                      && ((std::constructible_from<Stored<Types>, Arg &&> + ...) == 1)
+            void emplace(Arg &&arg)
+            {
+                constexpr std::size_t idx = []<std::size_t ...Is>(std::index_sequence<Is...>) {
+                    return ((std::constructible_from<Stored<Types...[Is]>, Arg &&> ? Is : 0) + ...);
+                } (std::make_index_sequence<count> { });
+
+                std::get<idx>(data_).emplace(std::forward<Arg>(arg));
+            }
+
             [[nodiscard]] bool ready() const noexcept
             {
-                return std::ranges::all_of(data_, &std::optional<Stored>::has_value);
+                if constexpr (is_homogeneous)
+                    return std::ranges::all_of(data_, &std::optional<Stored<Types...[0]>>::has_value);
+                else
+                    return std::apply([](const auto &...opts) { return (opts.has_value() && ...); }, data_);
             }
 
             [[nodiscard]] EnumMap build() &&
             {
-                return [&]<std::size_t ...Is>(std::index_sequence<Is...>) {
-                    return EnumMap { std::array<Stored, count> { std::move(*data_[Is])... } };
-                } (std::make_index_sequence<count> { });
+                if constexpr (is_homogeneous)
+                {
+                    return [&]<std::size_t ...Is>(std::index_sequence<Is...>) {
+                        return EnumMap { Storage { std::move(*data_[Is])... } };
+                    } (std::make_index_sequence<count> { });
+                }
+                else
+                {
+                    return std::apply([](auto &...opts) {
+                        return EnumMap { Storage { std::move(*opts)... } };
+                    }, data_);
+                }
             }
 
             private:
-            std::array<std::optional<Stored>, count> data_;
+            using PendingStorage = decltype([] {
+                if constexpr (is_homogeneous)
+                    return std::type_identity<std::array<std::optional<Stored<Types...[0]>>, count>> { };
+                else
+                    return std::type_identity<std::tuple<std::optional<Stored<Types>>...>> { };
+            } ())::type;
+
+            PendingStorage data_;
         };
 
-        std::array<Stored, count> data_;
+        Storage data_;
 
-        explicit EnumMap(std::array<Stored, count> &&data) noexcept
+        explicit EnumMap(Storage &&data) noexcept
             : data_ { std::move(data) } { }
+
+        public:
+        template<Enum Key>
+        using Element = ElementType<Key>;
+
+        template<typename Self>
+            requires is_homogeneous
+        [[nodiscard]] decltype(auto) operator[](this Self &&self, Enum key) noexcept
+        {
+            if constexpr (std::is_reference_v<Types...[0]>)
+                return self.data_[std::to_underlying(key)].get();
+            else
+                return (std::forward_like<Self>(self.data_)[std::to_underlying(key)]);
+        }
+
+        template<Enum Key, typename Self>
+        [[nodiscard]] decltype(auto) get(this Self &&self) noexcept
+        {
+            constexpr std::size_t idx = std::to_underlying(Key);
+            if constexpr (is_homogeneous)
+                return std::forward<Self>(self)[Key];
+            else if constexpr (std::is_reference_v<Types...[idx]>)
+                return std::get<idx>(self.data_).get();
+            else
+                return std::get<idx>(std::forward_like<Self>(self.data_));
+        }
     };
 
     class Theme
@@ -255,6 +268,10 @@ export namespace minesweeper
             sounds
         };
 
+        using Atlases = decltype([]<std::size_t ...Is>(std::index_sequence<Is...>) {
+            constexpr auto regions = magic_enum::enum_values<AtlasRegion>();
+            return std::type_identity<EnumMap<AtlasRegion, Atlas<AtlasRegions<regions[Is]>>...>> { };
+        } (std::make_index_sequence<magic_enum::enum_count<AtlasRegion>()> { }))::type;
         using Metrics = EnumMap<Metric, float>;
         using Fonts = EnumMap<Font::Type, Font>;
         using Colors = EnumMap<Color, sf::Color>;
