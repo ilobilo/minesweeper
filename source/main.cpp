@@ -52,7 +52,7 @@ int main(int argc, char **argv)
 
         if (!fs::is_directory(*assets))
         {
-            log::error("Path '{}' does not exist or is not a directory. Using built-in theme", *assets);
+            log::warn("Path '{}' does not exist or is not a directory. Using built-in theme", *assets);
             assets = std::nullopt;
         }
 

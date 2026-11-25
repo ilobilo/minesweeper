@@ -54,7 +54,7 @@ rule("pack_assets")
         target:add("cxflags", "--embed-dir=" .. autogendir, { force = true })
     end)
 
-    before_build(function (target)
+    before_prepare(function (target, opt)
         import("core.project.depend")
         import("utils.archive")
         import("utils.progress")
@@ -65,9 +65,9 @@ rule("pack_assets")
 
         depend.on_changed(function ()
             progress.show(
-                opt and opt.progress or 0,
-                "<%s> ${color.build.object}packing.$(mode) %s",
-                target:name(), path.filename(zipfile)
+                opt.progress,
+                "${color.build.object}packing.$(mode) %s",
+                path.filename(zipfile)
             )
 
             os.tryrm(zipfile)
