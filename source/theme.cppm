@@ -39,6 +39,22 @@ export namespace minesweeper
     template<AtlasRegion Region>
     using AtlasRegions = AtlasRegionElement<Region, TilesRegion, UiRegion>;
 
+    // god i love this god-forsaken language
+    static_assert([]<std::size_t ...Is>(std::index_sequence<Is...>) {
+        constexpr auto norm = [](std::string_view str) {
+            return str | std::views::filter([](char chr) { return chr != '_'; })
+                       | std::views::transform([](char chr) -> char { return chr | 32; });
+        };
+        return ([&](auto idx) {
+            constexpr auto reg = magic_enum::enum_values<AtlasRegion>()[idx];
+            constexpr auto enum_name = magic_enum::enum_name<reg>();
+            constexpr auto type_name = magic_enum::enum_type_name<AtlasRegions<reg>>();
+            constexpr std::string_view suffix { "Region" };
+            return std::to_underlying(reg) == idx && type_name.ends_with(suffix)
+                && std::ranges::equal(norm(enum_name), norm(type_name.substr(0, type_name.size() - suffix.size())));
+        } (std::integral_constant<std::size_t, Is> { }) && ...);
+    } (std::make_index_sequence<magic_enum::enum_count<AtlasRegion>()> { }));
+
     enum class Metric : std::size_t
     {
         tile_scale,
