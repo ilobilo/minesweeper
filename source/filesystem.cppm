@@ -23,7 +23,7 @@ export namespace minesweeper
         struct ErrorInfo
         {
             Error error;
-            std::string_view detail;
+            std::string detail;
 
             [[nodiscard]] std::string what() const;
         };
@@ -40,7 +40,7 @@ export namespace minesweeper
         Filesystem &operator=(const Filesystem &) = delete;
         Filesystem &operator=(Filesystem &&) = delete;
 
-        std::expected<void, ErrorInfo> mount_builtin(std::span<const std::byte> archive) noexcept;
+        std::expected<void, ErrorInfo> mount_builtin(std::span<const std::byte> archive);
         std::expected<void, ErrorInfo> mount_theme(const fs::path &assets, std::string_view name);
 
         void unmount_theme() noexcept;

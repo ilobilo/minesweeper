@@ -20,11 +20,11 @@ namespace minesweeper::log
             switch (lvl)
             {
                 case Level::info:
-                    return "\033[36minfo:\033[0m";
+                    return "\033[36mINFO:\033[0m";
                 case Level::warn:
-                    return "\033[33mwarning:\033[0m";
+                    return "\033[33mWARN:\033[0m";
                 case Level::error:
-                    return "\033[31merror:\033[0m";
+                    return "\033[31mERROR:\033[0m";
                     break;
             }
             std::unreachable();
@@ -43,7 +43,7 @@ namespace minesweeper::log
     export template<typename ...Args>
     void info(std::format_string<Args...> fmt, Args &&...args)
     {
-         detail::println<detail::Level::info>(fmt, std::forward<Args>(args)...);
+        detail::println<detail::Level::info>(fmt, std::forward<Args>(args)...);
     }
 
     export template<typename ...Args>

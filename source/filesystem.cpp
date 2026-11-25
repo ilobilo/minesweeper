@@ -10,15 +10,28 @@ namespace minesweeper
 {
     namespace
     {
+        constexpr bool is_ascii_alnum(char chr) noexcept
+        {
+            return (chr >= 'a' && chr <= 'z')
+                || (chr >= 'A' && chr <= 'Z')
+                || (chr >= '0' && chr <= '9');
+        }
+
         bool valid_theme_name(std::string_view name) noexcept
         {
             return !name.empty() && name.front() != '-' && name.back() != '-'
                 && std::ranges::all_of(name, [](char chr) {
-                    return std::isalnum(static_cast<unsigned char>(chr)) || chr == '_' || chr == '-';
+                    return is_ascii_alnum(chr) || chr == '_' || chr == '-';
                 });
         }
 
-        std::string_view detail(PHYSFS_ErrorCode code) noexcept
+        std::string to_utf8(const fs::path &path)
+        {
+            const auto u8 = path.u8string();
+            return { reinterpret_cast<const char *>(u8.data()), u8.size() };
+        }
+
+        std::string_view physfs_detail(PHYSFS_ErrorCode code) noexcept
         {
             const char *str;
             if (code == PHYSFS_ERR_OK || !(str = PHYSFS_getErrorByCode(code)))
@@ -31,27 +44,32 @@ namespace minesweeper
             switch (error)
             {
                 case Filesystem::Error::init_failed:
-                    return "Failed to initialize PhysFS";
+                    return "Failed to initialize virtual filesystem";
                 case Filesystem::Error::mount_failed:
-                    return "Failed to mount archive";
+                    return "Failed to mount theme archive";
                 case Filesystem::Error::theme_not_found:
-                    return "Theme directory or archive not found";
+                    return "Theme not found";
                 case Filesystem::Error::invalid_theme_name:
                     return "Invalid theme name";
                 case Filesystem::Error::invalid_theme_layout:
-                    return "Theme is missing 'theme.json'";
+                    return "Invalid theme layout";
             }
             std::unreachable();
         }
 
-        auto physfs_error(Filesystem::Error error, PHYSFS_ErrorCode code = PHYSFS_getLastErrorCode()) noexcept
+        auto fs_error(Filesystem::Error error, std::string detail = { }) noexcept
         {
-            return std::unexpected { Filesystem::ErrorInfo { .error = error, .detail = detail(code) } };
+            return std::unexpected { Filesystem::ErrorInfo { .error = error, .detail = std::move(detail) } };
         }
 
-        auto fs_error(Filesystem::Error error) noexcept
+        auto physfs_error(Filesystem::Error error, std::string context = { }, PHYSFS_ErrorCode code = PHYSFS_getLastErrorCode())
         {
-            return std::unexpected { Filesystem::ErrorInfo { .error = error, .detail { } } };
+            const auto reason = physfs_detail(code);
+            if (context.empty())
+                return fs_error(error, std::string { reason });
+            if (reason.empty())
+                return fs_error(error, std::move(context));
+            return fs_error(error, std::format("{} (PhysFS: {})", std::move(context), reason));
         }
     } // namespace
 
@@ -60,7 +78,7 @@ namespace minesweeper
         std::string err { error_name(error) };
         if (detail.empty())
             return err;
-        return std::format("{}. PhysFS returned '{}'", std::move(err), detail);
+        return std::format("{}: {}", std::move(err), detail);
     }
 
     auto Filesystem::create(const char *argv0) noexcept -> std::expected<Filesystem, ErrorInfo>
@@ -78,17 +96,24 @@ namespace minesweeper
             PHYSFS_deinit();
     }
 
-    auto Filesystem::mount_builtin(std::span<const std::byte> archive) noexcept -> std::expected<void, ErrorInfo>
+    auto Filesystem::mount_builtin(std::span<const std::byte> archive) -> std::expected<void, ErrorInfo>
     {
         if (!PHYSFS_mountMemory(archive.data(), archive.size(), nullptr, "builtin.zip", "/", 1))
-            return physfs_error(Error::mount_failed);
+            return physfs_error(Error::mount_failed, "built-in theme archive");
         return { };
     }
 
     auto Filesystem::mount_theme(const fs::path &assets, std::string_view name) -> std::expected<void, ErrorInfo>
     {
         if (!valid_theme_name(name))
-            return fs_error(Error::invalid_theme_name);
+        {
+            return fs_error(
+                Error::invalid_theme_name,
+                name.empty()
+                    ? "name must not be empty"
+                    : std::format("'{}' (must match '^\\w([\\w-]*\\w)?$)'", name)
+            );
+        }
 
         const std::string stem { name };
         const std::array candidates { assets / stem, assets / (stem + ".zip") };
@@ -105,23 +130,31 @@ namespace minesweeper
         }
 
         if (!found)
-            return fs_error(Error::theme_not_found);
+        {
+            return fs_error(
+                Error::theme_not_found,
+                std::format("'{0}' (expected '{0}/' or '{0}.zip' in '{1}')", name, to_utf8(assets))
+            );
+        }
 
         std::error_code ec;
         const auto normalised = fs::weakly_canonical(*found, ec);
-        const auto native = ec ? found->lexically_normal().string() : normalised.string();
+        const auto native = to_utf8(ec ? found->lexically_normal() : normalised);
 
         if (theme_mount_ == native)
             return { };
 
-         if (!PHYSFS_mount(native.c_str(), "/", 0))
-            return physfs_error(Error::mount_failed);
+        if (!PHYSFS_mount(native.c_str(), "/", 0))
+            return physfs_error(Error::mount_failed, std::format("'{}' ('{}')", name, native));
 
         const char *provider = PHYSFS_getRealDir("theme.json");
         if (provider == nullptr || native != provider)
         {
             PHYSFS_unmount(native.c_str());
-            return physfs_error(Error::invalid_theme_layout);
+            return fs_error(
+                Error::invalid_theme_layout,
+                std::format("'{}' ('{}') is missing 'theme.json' manifest", name, native)
+            );
         }
 
         if (theme_mount_)
