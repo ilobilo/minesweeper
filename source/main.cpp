@@ -33,7 +33,7 @@ constexpr unsigned char builtin_theme[] {
 
 int main(int argc, char **argv)
 {
-    namespace log = minesweeper::log;
+    using namespace minesweeper;
 
     CLI::App app { "A Minesweeper-like game written in C++", "minesweeper" };
     try {
@@ -44,9 +44,9 @@ int main(int argc, char **argv)
         app.add_option("-a,--assets", *assets, "Directory containing game themes")
             ->default_str(*assets);
 
-        std::string theme { "default" };
-        app.add_option("-t,--theme", theme, "Name of the theme to use")
-            ->default_str(theme);
+        std::string theme_dir { "default" };
+        app.add_option("-t,--theme", theme_dir, "Name of the theme to use ({assets}/{theme}/)")
+            ->default_str(theme_dir);
 
         app.parse(argc, argv);
 
@@ -56,7 +56,7 @@ int main(int argc, char **argv)
             assets = std::nullopt;
         }
 
-        auto fs = minesweeper::Filesystem::create(argv[0]);
+        auto fs = Filesystem::create(argv[0]);
         if (!fs)
         {
             log::error("{}", fs.error().what());
@@ -71,11 +71,18 @@ int main(int argc, char **argv)
 
         if (assets)
         {
-            if (const auto res = fs->mount_theme(*assets, theme); !res)
+            if (const auto res = fs->mount_theme(*assets, theme_dir); !res)
                 log::warn("{}. Using built-in theme", res.error().what());
         }
 
-        minesweeper::Game game;
+        auto theme = Theme::create();
+        if (!theme)
+        {
+            log::error("{}", theme.error().what());
+            return 1;
+        }
+
+        Game game;
         game.run();
     }
     catch (const CLI::ParseError &err)

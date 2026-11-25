@@ -148,7 +148,7 @@ export namespace minesweeper
         using Stored = std::conditional_t<
             std::is_reference_v<Type>,
             std::reference_wrapper<std::remove_reference_t<Type>>,
-            Type
+            std::remove_cv_t<Type>
         >;
 
         template<Enum Key>
@@ -265,14 +265,27 @@ export namespace minesweeper
     class Theme
     {
         public:
-        enum class Error
+        struct Error
         {
-            manifest_not_found,
-            invalid_manifest,
-            unsupported_version,
-            missing_field,
-            invalid_value,
-            asset_load_failed
+            enum class Type
+            {
+                manifest_not_found,
+                invalid_manifest,
+                unsupported_version,
+                missing_field,
+                invalid_value,
+                asset_not_found,
+                invalid_asset
+            };
+            using enum Type;
+
+            Type error;
+            std::string detail;
+
+            Error(Type error, std::string detail = { }) noexcept
+                : error { error }, detail { std::move(detail) } { }
+
+            [[nodiscard]] std::string what() const;
         };
 
         enum class Section

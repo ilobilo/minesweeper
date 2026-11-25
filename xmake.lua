@@ -20,7 +20,8 @@ set_runtimes("stdc++_shared")
 set_policy("build.c++.modules", true)
 set_policy("build.c++.modules.std", true)
 set_policy("build.c++.modules.two_phases", true)
-set_policy("build.c++.modules.clang.precompile_reduced_bmi", true)
+-- commented out until a bug in clang that causes it to crash is fixed
+-- set_policy("build.c++.modules.clang.precompile_reduced_bmi", true)
 
 set_defaultmode("release")
 set_optimize("fastest")
