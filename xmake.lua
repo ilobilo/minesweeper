@@ -20,7 +20,7 @@ set_runtimes("stdc++_shared")
 set_policy("build.c++.modules", true)
 set_policy("build.c++.modules.std", true)
 set_policy("build.c++.modules.two_phases", true)
--- commented out until a bug in clang that causes it to crash is fixed
+-- https://github.com/llvm/llvm-project/issues/246162
 -- set_policy("build.c++.modules.clang.precompile_reduced_bmi", true)
 
 set_defaultmode("release")

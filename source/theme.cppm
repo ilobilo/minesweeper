@@ -246,7 +246,7 @@ export namespace minesweeper
             if constexpr (std::is_reference_v<Types...[0]>)
                 return self.data_[std::to_underlying(key)].get();
             else
-                return (std::forward_like<Self>(self.data_)[std::to_underlying(key)]);
+                return (std::forward_like<Self>(self.data_[std::to_underlying(key)]));
         }
 
         template<Enum Key, typename Self>

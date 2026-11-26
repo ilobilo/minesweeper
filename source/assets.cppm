@@ -119,27 +119,26 @@ export namespace minesweeper
         Asset &operator=(const Asset &) = delete;
         Asset &operator=(Asset &&) = delete;
 
-        template<typename Self>
-        [[nodiscard]] decltype(auto) get(this Self &&self) noexcept
+        [[nodiscard]] auto &get(this auto &self) noexcept
         {
-            return (std::forward_like<Self>(self).object_);
+            return self.object_;
         }
 
-        template<typename Self>
-        [[nodiscard]] decltype(auto) operator*(this Self &&self) noexcept
+        [[nodiscard]] auto &operator*(this auto &self) noexcept
         {
-            return (std::forward_like<Self>(self).object_);
+            return self.object_;
         }
 
-        [[nodiscard]] decltype(auto) operator->(this auto &&self) noexcept
+        [[nodiscard]] auto operator->(this auto &self) noexcept
         {
             return std::addressof(self.object_);
         }
 
-        template<typename Self, typename ...Args>
-        [[nodiscard]] Loader::Instance instantiate(this Self &&self, Args &&...args)
+        template<typename ...Args>
+            requires (!std::is_void_v<typename Loader::Instance>)
+        [[nodiscard]] Loader::Instance instantiate(this auto &self, Args &&...args)
         {
-            return { std::forward_like<Self>(self).object_, std::forward<Args>(args)... };
+            return { std::as_const(self.object_), std::forward<Args>(args)... };
         }
 
         private:

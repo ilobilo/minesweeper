@@ -4,13 +4,6 @@ module minesweeper;
 
 namespace minesweeper
 {
-    std::optional<Cell &> Board::at(std::size_t x, std::size_t y) noexcept
-    {
-        if (x >= width_ || y >= height_)
-            return std::nullopt;
-        return cells_[idx(x, y)];
-    }
-
     void Board::reset()
     {
         if (positions_.empty())

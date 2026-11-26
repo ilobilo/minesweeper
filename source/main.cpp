@@ -40,20 +40,20 @@ int main(int argc, char **argv)
         app.formatter(std::make_shared<CompactFormatter>());
         app.failure_message(CLI::FailureMessage::help);
 
-        std::optional<fs::path> assets { "./assets" };
-        app.add_option("-a,--assets", *assets, "Directory containing game themes")
-            ->default_str(*assets);
+        std::optional<fs::path> assets_dir { "./assets" };
+        app.add_option("-a,--assets", *assets_dir, "Directory containing game themes")
+            ->default_str(*assets_dir);
 
-        std::string theme_dir { "default" };
-        app.add_option("-t,--theme", theme_dir, "Name of the theme to use ({assets}/{theme}/)")
-            ->default_str(theme_dir);
+        std::string theme_path { "default" };
+        app.add_option("-t,--theme", theme_path, "Name of the theme to use ({assets}/{theme}/)")
+            ->default_str(theme_path);
 
         app.parse(argc, argv);
 
-        if (!fs::is_directory(*assets))
+        if (!fs::is_directory(*assets_dir))
         {
-            log::warn("Path '{}' does not exist or is not a directory. Using built-in theme", *assets);
-            assets = std::nullopt;
+            log::warn("Path '{}' does not exist or is not a directory. Using built-in theme", *assets_dir);
+            assets_dir = std::nullopt;
         }
 
         auto fs = Filesystem::create(argv[0]);
@@ -69,9 +69,9 @@ int main(int argc, char **argv)
             return 1;
         }
 
-        if (assets)
+        if (assets_dir)
         {
-            if (const auto res = fs->mount_theme(*assets, theme_dir); !res)
+            if (const auto res = fs->mount_theme(*assets_dir, theme_path); !res)
                 log::warn("{}. Using built-in theme", res.error().what());
         }
 

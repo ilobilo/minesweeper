@@ -61,7 +61,14 @@ export namespace minesweeper
         std::size_t height() const noexcept { return height_; }
         State state() const noexcept { return state_; }
 
-        std::optional<Cell &> at(std::size_t x, std::size_t y) noexcept;
+        auto at(this auto &self, std::size_t x, std::size_t y) noexcept
+        {
+            using Ret = std::optional<decltype(std::forward_like<decltype(self)>(std::declval<Cell &>()))>;
+            if (x >= self.width_ || y >= self.height_)
+                return Ret { };
+            return Ret { self.cells_[self.idx(x, y)] };
+        }
+
         void reset();
 
         Result reveal(std::size_t x, std::size_t y);
