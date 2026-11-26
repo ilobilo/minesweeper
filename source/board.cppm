@@ -37,6 +37,7 @@ export namespace minesweeper
 
         enum class State
         {
+            ready,
             playing,
             won,
             lost
@@ -57,8 +58,13 @@ export namespace minesweeper
         static constexpr std::size_t min_mines = 1;
 
         std::size_t max_mines() const noexcept { return max_mines(width_, height_); }
+
         std::size_t width() const noexcept { return width_; }
         std::size_t height() const noexcept { return height_; }
+
+        std::size_t mine_count() const noexcept { return mine_count_; }
+        std::size_t flagged_count() const noexcept { return flagged_count_; }
+
         State state() const noexcept { return state_; }
 
         auto at(this auto &self, std::size_t x, std::size_t y) noexcept
@@ -92,7 +98,7 @@ export namespace minesweeper
         }
 
         std::size_t width_, height_;
-        std::size_t mine_count_, revealed_count_;
+        std::size_t mine_count_, flagged_count_, revealed_count_;
         std::vector<Cell> cells_;
 
         std::vector<std::size_t> positions_;
@@ -104,6 +110,8 @@ export namespace minesweeper
         {
             return y * width_ + x;
         }
+
+        void start_playing(std::size_t safe_x, std::size_t safe_y);
 
         Result reveal_cell(std::size_t x, std::size_t y) noexcept;
         Result flood_reveal(std::size_t x, std::size_t y);

@@ -4,41 +4,59 @@ module minesweeper;
 
 namespace minesweeper
 {
-    void Board::reset()
+    void Board::start_playing(std::size_t safe_x, std::size_t safe_y)
     {
-        if (positions_.empty())
-            positions_.resize(cells_.size());
-        else
-            std::ranges::fill(cells_, Cell { });
+        const auto is_safe = [&](std::size_t x, std::size_t y) {
+            const auto dx = x > safe_x ? x - safe_x : safe_x - x;
+            const auto dy = y > safe_y ? y - safe_y : safe_y - y;
+            return dx <= 1 &&dy <= 1;
+        };
 
-        std::ranges::iota(positions_, 0);
+        positions_.clear();
+        for (std::size_t y = 0; y < height_; ++y)
+        {
+            for (std::size_t x = 0; x < width_; ++x)
+            {
+                if (!is_safe(x, y))
+                    positions_.push_back(idx(x, y));
+            }
+        }
+
         std::ranges::shuffle(positions_, rng_);
 
         for (const auto i : positions_ | std::views::take(mine_count_))
-            cells_[i].has_mine = true;
-
-        for (auto [i, cell] : cells_ | std::views::enumerate)
         {
+            cells_[i].has_mine = true;
             const auto y = i / width_, x = i - y * width_;
-            iterate_adjacent(x, y, [&cell](Cell &adjacent, auto, auto) {
+            iterate_adjacent(x, y, [](Cell &adjacent, auto, auto) {
                 if (adjacent.has_mine)
-                    cell.adjacent++;
+                    adjacent.adjacent++;
                 return true;
             });
         }
 
-        revealed_count_ = 0;
         state_ = State::playing;
+    }
+
+    void Board::reset()
+    {
+        std::ranges::fill(cells_, Cell { });
+        flagged_count_ = 0;
+        revealed_count_ = 0;
+        state_ = State::ready;
     }
 
     auto Board::reveal(std::size_t x, std::size_t y) -> Result
     {
-        if (state_ != State::playing)
+        if (state_ != State::ready && state_ != State::playing)
             return Result::none;
 
         const auto cell = at(x, y);
         if (!cell || cell->is_flagged())
             return Result::none;
+
+        if (state_ == State::ready)
+            start_playing(x, y);
 
         if (!cell->revealed)
             return flood_reveal(x, y);
@@ -84,9 +102,11 @@ namespace minesweeper
         {
             case Mark::none:
                 cell->mark = Mark::flagged;
+                flagged_count_++;
                 return Result::flagged;
             case Mark::flagged:
                 cell->mark = Mark::question;
+                flagged_count_--;
                 return Result::questioned;
             case Mark::question:
                 cell->mark = Mark::none;
@@ -181,7 +201,11 @@ namespace minesweeper
     }
 
     Board::Board(std::size_t width, std::size_t height, std::size_t mine_count, std::random_device::result_type seed)
-        : width_ { width }, height_ { height }, mine_count_ { mine_count }, revealed_count_ { 0 },
-          cells_(width * height), positions_ { }, rng_ { seed }, state_ { State::playing }
-    { reset(); }
+        : width_ { width }, height_ { height },
+          mine_count_ { mine_count }, flagged_count_ { 0 }, revealed_count_ { 0 },
+          cells_(width * height), rng_ { seed }, state_ { State::ready }
+    {
+        positions_.reserve(cells_.size());
+        reset();
+    }
 } // namespace minesweeper
