@@ -6,6 +6,8 @@ import magic_enum;
 import std;
 
 import :assets;
+import :filesystem;
+import :utilities;
 
 export namespace minesweeper
 {
@@ -313,6 +315,8 @@ export namespace minesweeper
         [[nodiscard]] const Colors &colors() const noexcept { return colors_; }
         [[nodiscard]] const Sounds &sounds() const noexcept { return sounds_; }
 
+        static std::expected<std::string, Error> peek_name(std::string_view manifest_json);
+
         static std::expected<Theme, Error> create();
 
         private:
@@ -332,5 +336,49 @@ export namespace minesweeper
               atlases_ { std::move(atlases) }, metrics_ { std::move(metrics) },
               fonts_ { std::move(fonts) }, colors_ { std::move(colors) },
               sounds_ { std::move(sounds) } { }
+    };
+
+    struct ThemeInfo
+    {
+        std::string id;
+        std::string name;
+    };
+
+    class ThemeManager
+    {
+        public:
+        static constexpr std::string_view builtin_id = "default";
+
+        using Error = std::variant<Filesystem::ErrorInfo, Theme::Error>;
+
+        [[nodiscard]] static std::string format_error(const Error &error);
+
+        static std::expected<ThemeManager, Error> create(
+            Filesystem filesystem,
+            std::optional<fs::path> assets_dir = std::nullopt,
+            std::string_view initial_theme = builtin_id
+        );
+
+        [[nodiscard]] const Theme &current() const noexcept { return theme_; }
+        [[nodiscard]] std::string_view current_id() const noexcept { return current_id_; }
+
+        [[nodiscard]] std::vector<ThemeInfo> discover() const;
+
+        std::expected<void, Error> switch_to(std::string_view id, std::function<void()> before_swap = { });
+
+        private:
+        Filesystem fs_;
+        std::optional<fs::path> assets_dir_;
+        std::string builtin_name_;
+        std::string current_id_;
+        Theme theme_;
+
+        ThemeManager(
+            Filesystem fs, std::optional<fs::path> assets_dir,
+            std::string builtin_name, std::string current_id, Theme theme
+        ) noexcept
+            : fs_ { std::move(fs) }, assets_dir_ { std::move(assets_dir) },
+              builtin_name_ { std::move(builtin_name) }, current_id_ { std::move(current_id) },
+              theme_ { std::move(theme) } { }
     };
 } // export namespace minesweeper

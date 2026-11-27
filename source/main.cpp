@@ -40,20 +40,37 @@ int main(int argc, char **argv)
         app.formatter(std::make_shared<CompactFormatter>());
         app.failure_message(CLI::FailureMessage::help);
 
-        std::optional<fs::path> assets_dir { "./assets" };
-        app.add_option("-a,--assets", *assets_dir, "Directory containing game themes")
-            ->default_str(*assets_dir);
+        fs::path assets_path { "./assets" };
+        auto* assets_opt = app.add_option("-a,--assets", assets_path, "Directory containing game themes")
+            ->default_str(assets_path);
 
-        std::string theme_path { "default" };
-        app.add_option("-t,--theme", theme_path, "Name of the theme to use ({assets}/{theme}/)")
-            ->default_str(theme_path);
+        std::string theme_id { "default" };
+        app.add_option("-t,--theme", theme_id, "Name of the theme to use ({assets}/{theme}/)")
+            ->default_str(theme_id);
 
         app.parse(argc, argv);
 
-        if (!fs::is_directory(*assets_dir))
+        std::optional<fs::path> assets_dir;
+        std::error_code ec;
+
+        if (fs::is_directory(assets_path, ec))
         {
-            log::warn("Path '{}' does not exist or is not a directory. Using built-in theme", *assets_dir);
-            assets_dir = std::nullopt;
+            assets_dir = std::move(assets_path);
+        }
+        else if (assets_opt->count() > 0)
+        {
+            log::error(
+                "Assets path '{}' is not a valid directory{}",
+                assets_path.string(), ec ? ": " + ec.message() : ""
+            );
+            return 1;
+        }
+        else
+        {
+            log::warn(
+                "Default assets path '{}' does not exist or is not a directory. Using built-in theme",
+                assets_path.string()
+            );
         }
 
         auto fs = Filesystem::create(argv[0]);
@@ -69,20 +86,14 @@ int main(int argc, char **argv)
             return 1;
         }
 
-        if (assets_dir)
+        auto themes = ThemeManager::create(std::move(*fs), std::move(assets_dir), std::move(theme_id));
+        if (!themes)
         {
-            if (const auto res = fs->mount_theme(*assets_dir, theme_path); !res)
-                log::warn("{}. Using built-in theme", res.error().what());
-        }
-
-        auto theme = Theme::create();
-        if (!theme)
-        {
-            log::error("{}", theme.error().what());
+            log::error("{}", ThemeManager::format_error(themes.error()));
             return 1;
         }
 
-        Game game;
+        Game game { std::move(*themes) };
         game.run();
     }
     catch (const CLI::ParseError &err)

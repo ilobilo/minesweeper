@@ -1,0 +1,142 @@
+diff --git a/src/SFML/Modules/Audio.cppm b/src/SFML/Modules/Audio.cppm
+index dd6b565..f51a48a 100644
+--- a/src/SFML/Modules/Audio.cppm
++++ b/src/SFML/Modules/Audio.cppm
+@@ -35,6 +35,7 @@ export module sfml:Audio;
+ export import :System;
+ 
+ export namespace sf {
++    using sf::AudioResource;
+     using sf::InputSoundFile;
+     namespace Listener {
+         using sf::Listener::Cone;
+@@ -55,10 +56,17 @@ export namespace sf {
+     using sf::Music;
+     using sf::OutputSoundFile;
+     namespace PlaybackDevice {
++        using sf::PlaybackDevice::Notification;
++        using sf::PlaybackDevice::NotificationCallback;
+         using sf::PlaybackDevice::getAvailableDevices;
+         using sf::PlaybackDevice::getDefaultDevice;
+         using sf::PlaybackDevice::setDevice;
++        using sf::PlaybackDevice::setDeviceToDefault;
++        using sf::PlaybackDevice::setDeviceToNull;
+         using sf::PlaybackDevice::getDevice;
++        using sf::PlaybackDevice::getDeviceSampleRate;
++        using sf::PlaybackDevice::isDefaultDevice;
++        using sf::PlaybackDevice::setNotificationCallback;
+     }
+     using sf::Sound;
+     using sf::SoundBuffer;
+diff --git a/src/SFML/Modules/Graphics.cppm b/src/SFML/Modules/Graphics.cppm
+index 716b3ee..ded32f2 100644
+--- a/src/SFML/Modules/Graphics.cppm
++++ b/src/SFML/Modules/Graphics.cppm
+@@ -82,4 +82,20 @@ export namespace sf {
+     using sf::VertexArray;
+     using sf::VertexBuffer;
+     using sf::View;
++
++    using sf::BlendAlpha;
++    using sf::BlendAdd;
++    using sf::BlendMultiply;
++    using sf::BlendMin;
++    using sf::BlendMax;
++    using sf::BlendNone;
++
++    using sf::operator==;
++    using sf::operator!=;
++    using sf::operator+;
++    using sf::operator-;
++    using sf::operator*;
++    using sf::operator+=;
++    using sf::operator-=;
++    using sf::operator*=;
+ }
+diff --git a/src/SFML/Modules/Network.cppm b/src/SFML/Modules/Network.cppm
+index 88dd93a..b664216 100644
+--- a/src/SFML/Modules/Network.cppm
++++ b/src/SFML/Modules/Network.cppm
+@@ -39,12 +39,23 @@ export namespace sf {
+     using sf::Http;
+     using sf::IpAddress;
+     using sf::Packet;
++    using sf::Sftp;
+     using sf::Socket;
+     using sf::SocketHandle;
+     using sf::SocketSelector;
+     using sf::TcpListener;
+     using sf::TcpSocket;
+     using sf::UdpSocket;
++    namespace Dns {
++        using sf::Dns::MxRecord;
++        using sf::Dns::SrvRecord;
++        using sf::Dns::resolve;
++        using sf::Dns::queryNs;
++        using sf::Dns::queryMx;
++        using sf::Dns::querySrv;
++        using sf::Dns::queryTxt;
++        using sf::Dns::getPublicAddress;
++    }
+ 
+     using sf::operator==;
+     using sf::operator!=;
+diff --git a/src/SFML/Modules/System.cppm b/src/SFML/Modules/System.cppm
+index 667b467..ab073fa 100644
+--- a/src/SFML/Modules/System.cppm
++++ b/src/SFML/Modules/System.cppm
+@@ -64,11 +64,38 @@ export namespace sf {
+     using sf::Vector3;
+     using sf::Vector3i;
+     using sf::Vector3f;
++    using sf::Vector3u;
++    using sf::TimeoutWithPredicate;
+ 
+     using sf::degrees;
+     using sf::radians;
+     using sf::err;
+     using sf::sleep;
++    using sf::seconds;
++    using sf::milliseconds;
++    using sf::microseconds;
++
++    using sf::operator==;
++    using sf::operator!=;
++    using sf::operator<;
++    using sf::operator>;
++    using sf::operator<=;
++    using sf::operator>=;
++    using sf::operator+;
++    using sf::operator-;
++    using sf::operator*;
++    using sf::operator/;
++    using sf::operator%;
++    using sf::operator+=;
++    using sf::operator-=;
++    using sf::operator*=;
++    using sf::operator/=;
++    using sf::operator%=;
++
++    namespace Literals {
++        using sf::Literals::operator""_deg;
++        using sf::Literals::operator""_rad;
++    }
+ 
+     constexpr inline int VERSION_MAJOR = SFML_VERSION_MAJOR;
+     constexpr inline int VERSION_MINOR = SFML_VERSION_MINOR;
+diff --git a/src/SFML/Modules/Window.cppm b/src/SFML/Modules/Window.cppm
+index 5da99d7..413d2cb 100644
+--- a/src/SFML/Modules/Window.cppm
++++ b/src/SFML/Modules/Window.cppm
+@@ -105,4 +105,11 @@ export namespace sf {
+     }
+     using sf::State;
+     using sf::WindowHandle;
++
++    using sf::operator==;
++    using sf::operator!=;
++    using sf::operator<;
++    using sf::operator>;
++    using sf::operator<=;
++    using sf::operator>=;
+ }

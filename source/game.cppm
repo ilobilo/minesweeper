@@ -5,17 +5,14 @@ export module minesweeper:game;
 import sfml;
 
 import :board;
+import :theme;
 
 export namespace minesweeper
 {
     class Game
     {
-        static constexpr std::string_view window_title { "Minesweeper" };
-        static constexpr std::size_t window_width = 600, window_height = 800;
-        static constexpr std::size_t window_min_width = 300, window_min_height = 300;
-
         public:
-        Game();
+        Game(ThemeManager themes);
 
         void run();
 
@@ -28,10 +25,12 @@ export namespace minesweeper
             paused
         };
 
-        State state_;
-        std::optional<Board> board_;
-
         sf::RenderWindow window_;
+        ThemeManager themes_;
+        std::optional<Board> board_;
+        State state_;
+
+        void update_view(sf::Vector2u winsize);
 
         void handle_events();
         void update();

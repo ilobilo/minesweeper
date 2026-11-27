@@ -58,9 +58,12 @@ namespace minesweeper
         }
 
         template<typename Type>
-        auto require(const json &obj, std::string_view key, std::string_view path)
+        auto require(const json &obj, std::string_view key, std::string_view path = "")
             -> std::expected<Type, Theme::Error>
         {
+            if (path.empty())
+                path = key;
+
             const auto it = obj.find(key);
             if (it == obj.cend())
                 return missing_field(path);
@@ -123,6 +126,60 @@ namespace minesweeper
             if (!it->is_array())
                 return invalid_value(path, "expected JSON array");
             return *it;
+        }
+
+        auto read_manifest_file() -> std::expected<std::string, Theme::Error>
+        {
+            auto res = InputStream::create("theme.json");
+            if (!res)
+                return theme_error(Theme::Error::manifest_not_found);
+            auto stream = std::move(*res);
+
+            const auto size = stream->getSize();
+            if (!size)
+                return theme_error(Theme::Error::invalid_manifest, "could not determine file size");
+
+            std::string raw(*size, '\0');
+            if (*size == 0)
+                return raw;
+
+            if (const auto read = stream->read(raw.data(), raw.size()); !read || *read != raw.size())
+                return theme_error(Theme::Error::invalid_manifest, "could not read file contents");
+
+            return raw;
+        }
+
+        auto parse_manifest_root(std::string_view raw) -> std::expected<json, Theme::Error>
+        {
+            auto manifest = json::parse(raw, nullptr, false);
+            if (manifest.is_discarded())
+                return theme_error(Theme::Error::invalid_manifest, "JSON syntax error");
+            if (!manifest.is_object())
+                return theme_error(Theme::Error::invalid_manifest, "root value must be a JSON object");
+            return manifest;
+        }
+
+        auto parse_header(const json &manifest) -> std::expected<std::string, Theme::Error>
+        {
+            const auto version = require<std::size_t>(manifest, "version");
+            if (!version)
+                return std::unexpected { version.error() };
+
+            if (*version != supported_version)
+            {
+                return theme_error(
+                    Theme::Error::unsupported_version,
+                    std::format("got {}, expected {}", *version, supported_version)
+                );
+            }
+
+            auto name = require<std::string>(manifest, "name");
+            if (!name)
+                return std::unexpected { name.error() };
+            if (name->empty())
+                return invalid_value("name", "must not be empty");
+
+            return name;
         }
 
         auto parse_rect(const json &obj, std::string_view key, std::string_view path)
@@ -276,41 +333,28 @@ namespace minesweeper
         return std::format("{}: {}", std::move(err), detail);
     }
 
+    auto Theme::peek_name(std::string_view manifest_json) -> std::expected<std::string, Error>
+    {
+        const auto manifest = parse_manifest_root(manifest_json);
+        if (!manifest)
+            return std::unexpected { manifest.error() };
+        return parse_header(*manifest);
+    }
+
     auto Theme::create() -> std::expected<Theme, Error>
     {
-        auto res = InputStream::create("theme.json");
-        if (!res)
-            return theme_error(Error::manifest_not_found);
-        auto stream = std::move(*res);
+        const auto raw = read_manifest_file();
+        if (!raw)
+            return std::unexpected { raw.error() };
 
-        const auto size = stream->getSize();
-        if (!size)
-            return theme_error(Error::invalid_manifest, "could not determine file size");
+        const auto manifest_res = parse_manifest_root(*raw);
+        if (!manifest_res)
+            return std::unexpected { manifest_res.error() };
+        const auto &manifest = *manifest_res;
 
-        std::string raw(*size, '\0');
-        if (const auto read = stream->read(raw.data(), raw.size()); !read || *read != raw.size())
-            return theme_error(Error::invalid_manifest, "could not read file contents");
-
-        const auto manifest = json::parse(raw, nullptr, false);
-        if (manifest.is_discarded())
-            return theme_error(Error::invalid_manifest, "JSON syntax error");
-        if (!manifest.is_object())
-            return theme_error(Error::invalid_manifest, "root value must be a JSON object");
-
-        const auto version = require<std::size_t>(manifest, "version", "version");
-        if (!version)
-            return std::unexpected { version.error() };
-        if (*version != supported_version)
-            return theme_error(
-                Error::unsupported_version,
-                std::format("got {}, expected {}", *version, supported_version)
-            );
-
-        auto name = require<std::string>(manifest, "name", "name");
+        auto name = parse_header(manifest);
         if (!name)
             return std::unexpected { name.error() };
-        if (name->empty())
-            return invalid_value("name", "must not be empty");
 
         auto assets = std::make_unique<Assets>();
 
@@ -460,5 +504,159 @@ namespace minesweeper
             std::move(colors).build(),
             std::move(sounds).build()
         };
+    }
+
+    [[nodiscard]] std::string ThemeManager::format_error(const Error &error)
+    {
+        return std::visit([](const auto &err) { return err.what(); }, error);
+    }
+
+    auto ThemeManager::create(Filesystem filesystem, std::optional<fs::path> assets_dir, std::string_view initial_theme)
+        -> std::expected<ThemeManager, Error>
+    {
+        filesystem.unmount_theme();
+
+        if (initial_theme == builtin_id)
+        {
+            auto theme = Theme::create();
+            if (!theme)
+                return std::unexpected { Error { std::move(theme.error()) } };
+
+            std::string builtin_name { theme->name() };
+            return ThemeManager {
+                std::move(filesystem), std::move(assets_dir),
+                std::move(builtin_name), std::string { builtin_id }, std::move(*theme)
+            };
+        }
+
+        auto builtin_raw = read_manifest_file();
+        if (!builtin_raw)
+            return std::unexpected { Error { std::move(builtin_raw.error()) } };
+
+        auto builtin_name = Theme::peek_name(*builtin_raw);
+        if (!builtin_name)
+            return std::unexpected { Error { std::move(builtin_name.error()) } };
+
+        if (!assets_dir)
+        {
+            return std::unexpected { Error { Filesystem::ErrorInfo {
+                .error = Filesystem::Error::theme_not_found,
+                .detail = std::format("'{}' (no assets directory provided)", initial_theme)
+            } } };
+        }
+
+        if (auto mounted = filesystem.mount_theme(*assets_dir, initial_theme); !mounted)
+            return std::unexpected { Error { std::move(mounted.error()) } };
+
+        auto theme = Theme::create();
+        if (!theme)
+        {
+            filesystem.unmount_theme();
+            return std::unexpected { Error { std::move(theme.error()) } };
+        }
+
+        return ThemeManager {
+            std::move(filesystem), std::move(assets_dir),
+            std::move(*builtin_name), std::string { initial_theme }, std::move(*theme)
+        };
+    }
+
+    [[nodiscard]] std::vector<ThemeInfo> ThemeManager::discover() const
+    {
+        std::vector<ThemeInfo> themes;
+        themes.emplace_back(std::string { builtin_id }, builtin_name_);
+
+        if (!assets_dir_)
+            return themes;
+
+        std::error_code ec;
+        std::set<std::string> candidates;
+        for (const auto &entry : fs::directory_iterator { *assets_dir_, ec })
+        {
+            std::error_code entry_ec;
+            std::string id;
+
+            if (entry.is_directory(entry_ec))
+                id = util::to_utf8(entry.path().filename());
+            else if (entry.is_regular_file(entry_ec) && entry.path().extension() == ".zip")
+                id = util::to_utf8(entry.path().stem());
+            else
+                continue;
+
+            if (id != builtin_id && Filesystem::valid_theme_name(id))
+                candidates.insert(std::move(id));
+        }
+        if (ec)
+            return themes;
+
+        for (const auto &id : candidates)
+        {
+            if (id == current_id_)
+            {
+                themes.emplace_back(id, std::string { theme_.name() });
+                continue;
+            }
+
+            const auto manifest = fs_.read_theme_manifest(*assets_dir_, id);
+            if (!manifest)
+                continue;
+
+            auto name = Theme::peek_name(*manifest);
+            if (!name)
+                continue;
+
+            themes.emplace_back(id, std::move(*name));
+        }
+
+        return themes;
+    }
+
+    auto ThemeManager::switch_to(std::string_view id, std::function<void()> before_swap)
+        -> std::expected<void, Error>
+    {
+        if (id == current_id_)
+            return { };
+
+        if (id != builtin_id && !assets_dir_)
+        {
+            return std::unexpected { Error { Filesystem::ErrorInfo {
+                .error = Filesystem::Error::theme_not_found,
+                .detail = std::format("'{}' (no assets directory provided)", id)
+            } } };
+        }
+
+        const auto prev_id = current_id_;
+        const auto rollback = [&] {
+            fs_.unmount_theme();
+            if (prev_id != builtin_id && assets_dir_)
+                util::unused(fs_.mount_theme(*assets_dir_, prev_id));
+        };
+
+        if (id == builtin_id)
+        {
+            if (!fs_.unmount_theme())
+            {
+                return std::unexpected { Error { Filesystem::ErrorInfo {
+                    .error = Filesystem::Error::unmount_failed,
+                    .detail = std::format("'{}'", prev_id)
+                } } };
+            }
+        }
+        else if (auto mounted = fs_.mount_theme(*assets_dir_, id); !mounted)
+            return std::unexpected { Error { std::move(mounted.error()) } };
+
+        auto next = Theme::create();
+        if (!next)
+        {
+            rollback();
+            return std::unexpected { Error { std::move(next.error()) } };
+        }
+
+        if (before_swap)
+            before_swap();
+
+        theme_ = std::move(*next);
+        current_id_ = id;
+        return { };
     }
 } // namespace minesweeper

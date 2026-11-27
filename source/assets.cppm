@@ -42,6 +42,8 @@ export namespace minesweeper
         [[nodiscard]] std::optional<std::size_t> tell() override;
         std::optional<std::size_t> getSize() override;
 
+        [[nodiscard]] std::optional<std::vector<std::byte>> read_all();
+
         private:
         void *file_;
 
@@ -58,8 +60,9 @@ export namespace minesweeper
     struct AssetLoader<sf::Texture>
     {
         using Instance = sf::Sprite;
+        struct Storage { };
 
-        static bool load(sf::Texture &asset, sf::InputStream &stream)
+        static bool load(sf::Texture &asset, Storage &, InputStream &stream)
         {
             return asset.loadFromStream(stream);
         }
@@ -69,10 +72,16 @@ export namespace minesweeper
     struct AssetLoader<sf::Font>
     {
         using Instance = sf::Text;
+        using Storage = std::vector<std::byte>;
 
-        static bool load(sf::Font &asset, sf::InputStream &stream)
+        static bool load(sf::Font &asset, Storage &storage, InputStream &stream)
         {
-            return asset.openFromStream(stream);
+            auto bytes = stream.read_all();
+            if (!bytes || bytes->empty())
+                return false;
+
+            storage = std::move(*bytes);
+            return asset.openFromMemory(storage.data(), storage.size());
         }
     };
 
@@ -80,23 +89,26 @@ export namespace minesweeper
     struct AssetLoader<sf::SoundBuffer>
     {
         using Instance = sf::Sound;
+        struct Storage { };
 
-        static bool load(sf::SoundBuffer &asset, sf::InputStream &stream)
+        static bool load(sf::SoundBuffer &asset, Storage &, InputStream &stream)
         {
             return asset.loadFromStream(stream);
         }
     };
 
     template<typename Type>
-    concept LoadableAsset = requires(Type &asset, sf::InputStream &stream) {
+    concept LoadableAsset = requires(Type &asset, typename AssetLoader<Type>::Storage &storage, InputStream &stream) {
         typename AssetLoader<Type>::Instance;
-        { AssetLoader<Type>::load(asset, stream) } -> std::same_as<bool>;
+        typename AssetLoader<Type>::Storage;
+        { AssetLoader<Type>::load(asset, storage, stream) } -> std::same_as<bool>;
     };
 
     template<LoadableAsset Type>
     class Asset
     {
         using Loader = AssetLoader<Type>;
+        using Storage = Loader::Storage;
 
         public:
         static std::expected<Asset, AssetError> create(const std::string &path)
@@ -105,16 +117,19 @@ export namespace minesweeper
             if (!stream.has_value())
                 return std::unexpected { stream.error() };
 
-            Asset result { std::move(*stream) };
-            if (!Loader::load(result.object_, *result.stream_))
+            Asset result;
+            if (!Loader::load(result.object_, result.storage_, **stream))
                 return std::unexpected { AssetError::invalid_contents };
 
             return result;
         }
 
         Asset(const Asset &) = delete;
-        Asset(Asset &&other) noexcept(std::is_nothrow_move_constructible_v<Type>)
-            : stream_ { std::move(other.stream_) }, object_ { std::move(other.object_) } { }
+        Asset(Asset &&other) noexcept(
+            std::is_nothrow_move_constructible_v<Storage>
+            && std::is_nothrow_move_constructible_v<Type>
+        )
+            : storage_ { std::move(other.storage_) }, object_ { std::move(other.object_) } { }
 
         Asset &operator=(const Asset &) = delete;
         Asset &operator=(Asset &&) = delete;
@@ -142,11 +157,10 @@ export namespace minesweeper
         }
 
         private:
-        std::unique_ptr<InputStream> stream_;
+        [[no_unique_address]] Storage storage_;
         Type object_;
 
-        Asset(std::unique_ptr<InputStream> stream) noexcept
-            : stream_ { std::move(stream) }, object_ { } { }
+        Asset() = default;
     };
 
     template<LoadableAsset Type>

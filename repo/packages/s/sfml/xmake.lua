@@ -7,7 +7,9 @@ package("sfml")
     set_license("zlib")
 
     add_urls("https://github.com/mikomikotaishi/SFML.git")
+
     add_versions("3.1.0-modules", "45871e653581bc7dc50bed945d6ca21c7698dca9")
+    add_patches("3.1.0-modules", path.join(os.scriptdir(), "patches", "0001-sfml-module-exports.patch"), "5413d622eec2cc2323d2fe7630667bb3d7b6e68f99e409de2d5fc7e658074332")
 
     add_configs("graphics", { description = "Use the graphics module", default = true, type = "boolean" })
     add_configs("window",   { description = "Use the window module",   default = true, type = "boolean" })

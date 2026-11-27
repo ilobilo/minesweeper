@@ -60,4 +60,21 @@ namespace minesweeper
             return std::nullopt;
         return result;
     }
+
+    [[nodiscard]] std::optional<std::vector<std::byte>> InputStream::read_all()
+    {
+        const auto size = getSize();
+        if (!size || !seek(0))
+            return std::nullopt;
+
+        std::vector<std::byte> buffer(*size);
+        if (*size == 0)
+            return buffer;
+
+        const auto bytes_read = read(buffer.data(), buffer.size());
+        if (!bytes_read || *bytes_read != buffer.size())
+            return std::nullopt;
+
+        return buffer;
+    }
 } // namespace minesweeper
